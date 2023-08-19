@@ -99,7 +99,7 @@ fun DraggableTextScreen() {
                     text = "Drag me!"
                 )
             }
-            DragTwoDimention(
+            DragTwoDimension(
                 offsetX = offsetX,
                 offsetY = offsetY,
                 onDragText = { endOffset, dragAmount ->
@@ -236,7 +236,7 @@ fun PreviewDragVertically() {
 }
 
 @Composable
-fun DragTwoDimention(
+fun DragTwoDimension(
     offsetX: Float,
     offsetY: Float,
     onDragText: (endOffset: Offset, dragAmount: Offset) -> Unit,
@@ -265,7 +265,7 @@ fun DragTwoDimention(
 
 @Preview
 @Composable
-fun PreviewDragTwoDimention() {
+fun PreviewDragTwoDimension() {
     var containerSize by remember { mutableStateOf(Size.Zero) }
     Surface(
         modifier = Modifier
@@ -277,7 +277,7 @@ fun PreviewDragTwoDimention() {
         Box {
             var offsetX by remember { mutableStateOf(0f) }
             var offsetY by remember { mutableStateOf(0f) }
-            DragTwoDimention(
+            DragTwoDimension(
                 offsetX = offsetX,
                 offsetY = offsetY,
                 onDragText = { endOffset, dragAmount ->

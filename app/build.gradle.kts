@@ -5,7 +5,7 @@ plugins {
 
 android {
     namespace = "com.github.mikanichinose.dragAndDrop"
-    compileSdk = 33
+    compileSdk = 34
 
     defaultConfig {
         applicationId = "com.github.mikanichinose.dragAndDrop"

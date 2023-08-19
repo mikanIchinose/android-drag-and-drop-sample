@@ -33,7 +33,9 @@ class MainActivity : ComponentActivity() {
                     color = MaterialTheme.colorScheme.background
                 ) {
                     Column {
-                        val pagerState = rememberPagerState()
+                        val pagerState = rememberPagerState {
+                            0
+                        }
                         val scope = rememberCoroutineScope()
                         val tabContents =
                             listOf("Reorderable", "Reordable2", "DraggableText", "Todo")
@@ -50,7 +52,7 @@ class MainActivity : ComponentActivity() {
                                 )
                             }
                         }
-                        HorizontalPager(pageCount = tabContents.size, state = pagerState) {
+                        HorizontalPager(state = pagerState) {
                             when (it) {
                                 0 -> VerticalReorderList()
                                 1 -> DraggableScreen()

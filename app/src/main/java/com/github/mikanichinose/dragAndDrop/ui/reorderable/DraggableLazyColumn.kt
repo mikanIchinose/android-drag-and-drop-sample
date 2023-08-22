@@ -1,4 +1,4 @@
-package com.github.mikanichinose.dragAndDrop
+package com.github.mikanichinose.dragAndDrop.ui.reorderable
 
 import android.util.Log
 import androidx.compose.animation.core.animateDpAsState
@@ -8,13 +8,15 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyItemScope
 import androidx.compose.foundation.lazy.LazyListItemInfo
 import androidx.compose.foundation.lazy.LazyListState
-import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
@@ -38,97 +40,41 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 
+// https://gist.github.com/surajsau/f5342f443352195208029e98b0ee39f3
+// ↑ 多分ここを参考にしてる
+// https://cs.android.com/androidx/platform/frameworks/support/+/androidx-main:compose/foundation/foundation/integration-tests/foundation-demos/src/main/java/androidx/compose/foundation/demos/LazyColumnDragAndDropDemo.kt
 @Composable
 fun DraggableScreen() {
-    val list = remember { List(10) { "Item $it" }.toMutableStateList() }
-    DraggableLazyColumn(
-        items = list,
+    val list = remember { List(50) { "Item $it" }.toMutableStateList() }
+    val draggableLazyListState = rememberReorderableLazyListState(
         onMove = { from, to ->
             list.apply {
                 add(to, removeAt(from))
             }
-        },
+        }
     )
-}
 
-// 多分ここを参考にしてる https://cs.android.com/androidx/platform/frameworks/support/+/androidx-main:compose/foundation/foundation/integration-tests/foundation-demos/src/main/java/androidx/compose/foundation/demos/LazyColumnDragAndDropDemo.kt
-// https://gist.github.com/surajsau/f5342f443352195208029e98b0ee39f3
-// TODO: もっと整理する
-@OptIn(ExperimentalFoundationApi::class)
-@Composable
-fun <T> DraggableLazyColumn(
-    items: List<T>,
-    onMove: (from: Int, to: Int) -> Unit,
-) {
-    val scope = rememberCoroutineScope()
-    var overscrollJob by remember { mutableStateOf<Job?>(null) }
-    val lazyListState = rememberLazyListState()
-    val draggableLazyListState = rememberDraggableLazyListState(
-        lazyListState = lazyListState,
-        onMove = onMove,
-        scope = scope
-    )
     LazyColumn(
-        modifier = Modifier
-            .padding(16.dp)
-            .pointerInput(Unit) {
-                detectDragGesturesAfterLongPress(
-                    // この部分は、DraggableLazyListStateのonDragに移せないのか?
-                    onDrag = { change, dragAmount ->
-                        change.consume()
-                        draggableLazyListState.onDrag(dragAmount)
-                        if (overscrollJob?.isActive == true)
-                            return@detectDragGesturesAfterLongPress
-
-                        // jobが死んでいるとき
-                        draggableLazyListState
-                            .checkForOverScroll()
-                            .takeIf { it != 0f }
-                            ?.let {
-                                // リストの先頭または末尾に来たときに動く
-                                overscrollJob = scope.launch {
-                                    draggableLazyListState.lazyListState.scrollBy(it)
-                                }
-                            }
-                            ?: run {
-                                overscrollJob?.cancel()
-                            }
-                    },
-                    onDragStart = draggableLazyListState::onDragStart,
-                    onDragEnd = draggableLazyListState::onDragInterrupted,
-                    onDragCancel = draggableLazyListState::onDragInterrupted,
-                )
-            },
+        modifier = Modifier.reorderable(draggableLazyListState),
         state = draggableLazyListState.lazyListState,
     ) {
-        itemsIndexed(items, { _, item -> "$item" }) { index, item ->
-            val isDragging = draggableLazyListState.currentDraggedItemIndex == index
-            val elevation = animateDpAsState(if (isDragging) 16.dp else 0.dp, label = "")
-            val draggingModifier = if (isDragging) {
-                Modifier
-                    .zIndex(1f)
-                    .graphicsLayer {
-                        // ドラッグしているときの動きを描画
-                        val offsetOrNull = draggableLazyListState.itemDisplacement
-                        translationY = offsetOrNull ?: 0f
-                    }
-            } else {
-                Modifier.animateItemPlacement()
-            }
-            Box(
-                modifier = Modifier
-                    .padding(8.dp)
-                    .then(draggingModifier)
-            ) {
+        items(list, { it }) { item ->
+            DraggableItem(
+                state = draggableLazyListState,
+                key = item,
+            ) { isDragging ->
+                val elevation = animateDpAsState(if (isDragging) 16.dp else 0.dp, label = "")
                 Column(
                     modifier = Modifier
+                        .padding(8.dp)
                         .fillMaxWidth()
                         .shadow(elevation.value, RoundedCornerShape(100.dp))
                         .background(Color.White, RoundedCornerShape(100.dp))
                         .border(2.dp, Color.Red, RoundedCornerShape(100.dp))
                 ) {
                     Text(
-                        text = "$item", modifier = Modifier.padding(30.dp)
+                        text = item,
+                        modifier = Modifier.padding(30.dp),
                     )
                 }
             }
@@ -136,17 +82,57 @@ fun <T> DraggableLazyColumn(
     }
 }
 
+fun Modifier.reorderable(
+    state: ReorderableLazyListState
+): Modifier = then(
+    Modifier.pointerInput(Unit) {
+        // 長押し後にドラッグジェスチャーを処理する
+        detectDragGesturesAfterLongPress(
+            onDrag = { change, dragAmount ->
+                change.consume()
+                state.onDrag(dragAmount)
+            },
+            onDragStart = state::onDragStart,
+            onDragEnd = state::onDragInterrupted,
+            onDragCancel = state::onDragInterrupted,
+        )
+    }
+)
+
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+fun LazyItemScope.DraggableItem(
+    state: ReorderableLazyListState,
+    key: Any?,
+    modifier: Modifier = Modifier,
+    content: @Composable BoxScope.(isDragging: Boolean) -> Unit,
+) {
+    val isDragging = key == state.currentDraggedItemKey
+    val draggingModifier = if (isDragging) {
+        Modifier
+            .zIndex(1f)
+            .graphicsLayer {
+                // ドラッグしているときの動きを描画
+                translationY = state.itemDisplacement ?: 0f
+            }
+    } else {
+        Modifier.animateItemPlacement()
+    }
+    Box(modifier = modifier.then(draggingModifier)) {
+        content(isDragging)
+    }
 
 }
 
 @Composable
-fun rememberDraggableLazyListState(
-    lazyListState: LazyListState,
-    scope: CoroutineScope,
+fun rememberReorderableLazyListState(
+    lazyListState: LazyListState = rememberLazyListState(),
     onMove: (Int, Int) -> Unit,
-): DraggableLazyListState {
+): ReorderableLazyListState {
+    val scope = rememberCoroutineScope()
     return remember {
-        DraggableLazyListState(
+        ReorderableLazyListState(
             lazyListState = lazyListState,
             scope = scope,
             onMove = onMove,
@@ -154,14 +140,11 @@ fun rememberDraggableLazyListState(
     }
 }
 
-class DraggableLazyListState(
+class ReorderableLazyListState(
     val lazyListState: LazyListState,
     private val scope: CoroutineScope,
     private val onMove: (from: Int, to: Int) -> Unit,
 ) {
-    // 要素の移動距離
-    private var draggedDistance by mutableFloatStateOf(0f)
-
     // ドラッグを検知したときに更新される
     // DragInterruptedのときに解放される
     private var initialDraggedItem by mutableStateOf<LazyListItemInfo?>(null)
@@ -179,6 +162,11 @@ class DraggableLazyListState(
     // initialDraggedItemとの違いは?
     // 更新タイミングが違ってそう
     var currentDraggedItemIndex by mutableStateOf<Int?>(null)
+    val currentDraggedItemKey
+        get() = initialDraggedItem?.key
+
+    // 要素の移動距離
+    private var draggedDistance by mutableFloatStateOf(0f)
     val itemDisplacement: Float?
         get() = currentDraggedItemIndex
             ?.let { lazyListState.getVisibleItemInfoFor(it) }
@@ -194,7 +182,6 @@ class DraggableLazyListState(
                 currentDraggedItemIndex = it.index
                 initialDraggedItem = it
             }
-        log("pointer: $offset")
     }
 
     fun onDragInterrupted() {
@@ -250,13 +237,28 @@ class DraggableLazyListState(
                             }
                         }
                         currentDraggedItemIndex = item.index
-                        log("onMove ${lazyListState.layoutInfo.visibleItemsInfo.map { it.key }}")
                     }
             }
+
+            if (overscrollJob?.isActive == true)
+                return
+
+            // jobが仕事をしていない時
+            checkForOverScroll()
+                .takeIf { it != 0f }
+                ?.let {
+                    // リストの先頭または末尾に来たときに動く
+                    overscrollJob = scope.launch {
+                        lazyListState.scrollBy(it)
+                    }
+                }
+                ?: run {
+                    overscrollJob?.cancel()
+                }
         }
     }
 
-    fun checkForOverScroll(): Float {
+    private fun checkForOverScroll(): Float {
         return initialDraggedItem?.let {
             val startOffset = it.offset + draggedDistance
             val endOffset = it.offsetEnd + draggedDistance
@@ -279,6 +281,13 @@ class DraggableLazyListState(
         } ?: 0f
     }
 
+    private fun LazyListState.getVisibleItemInfoFor(absoluteIndex: Int): LazyListItemInfo? {
+        return layoutInfo.visibleItemsInfo.getOrNull((absoluteIndex - layoutInfo.visibleItemsInfo.first().index))
+    }
+
+    private val LazyListItemInfo.offsetEnd: Int
+        get() = offset + size
+
     private fun log(message: String = "") {
         Log.d(
             this.javaClass.simpleName,
@@ -295,10 +304,3 @@ class DraggableLazyListState(
     private fun LazyListItemInfo.prettyPrint(): String =
         "index: $index key: $key size: $size contentType: $contentType offset: $offset offsetEnd: $offsetEnd"
 }
-
-private fun LazyListState.getVisibleItemInfoFor(absoluteIndex: Int): LazyListItemInfo? {
-    return layoutInfo.visibleItemsInfo.getOrNull((absoluteIndex - layoutInfo.visibleItemsInfo.first().index))
-}
-
-private val LazyListItemInfo.offsetEnd: Int
-    get() = offset + size

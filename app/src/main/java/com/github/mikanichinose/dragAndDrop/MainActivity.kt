@@ -9,7 +9,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
-import com.github.mikanichinose.dragAndDrop.ui.DraggableScreen
+import com.github.mikanichinose.dragAndDrop.ui.reorderable.DraggableScreen
 import com.github.mikanichinose.dragAndDrop.ui.theme.DragAndDropTheme
 
 class MainActivity : ComponentActivity() {
@@ -23,6 +23,8 @@ class MainActivity : ComponentActivity() {
                     color = MaterialTheme.colorScheme.background
                 ) {
                     DraggableScreen()
+//                    ReorderableScreen()
+//                    LazyColumnDragAndDropDemo()
 //                    Column {
 //                        val tabContents =
 //                            listOf("Reorderable", "Reordable2", "DraggableText", "Todo")
